@@ -1,34 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { useFormik } from 'formik';
+import { useNavigate } from 'react-router-dom';
 
 import WindAnimation from '../../components/Animations/WaveAnimation';
 import { useStore } from '../../store/useStore';
 import { apiKeyValidation } from '../../helpers/validationHelpers';
+import { validateApiKey } from '../../core/requests/requests';
 
 const Landing: React.FC = () => {
+  const navigate = useNavigate();
   const { setApiKeyToStore: setApiKeyInStore } = useStore();
   const [showError, setShowError] = useState(false);
 
   const formik = useFormik({
     initialValues: { apiKey: '' },
     validationSchema: apiKeyValidation,
-    onSubmit: (values, { setSubmitting, resetForm }) => {
-      setApiKeyInStore(values.apiKey);
-      setSubmitting(false);
-      resetForm();
+    onSubmit: async (values, { setSubmitting, resetForm }) => {
+      const isValid = await validateApiKey(values.apiKey);
+
+      if (isValid) {
+        setApiKeyInStore(values.apiKey);
+        setSubmitting(false);
+        resetForm();
+        navigate('/home');
+      } else {
+        setShowError(true);
+        setSubmitting(false);
+      }
     },
   });
 
-  // Show error message only after the form is submitted and there is an error
+  // Show error message only after submission if the key is invalid
   useEffect(() => {
-    if (formik.submitCount > 0 && formik.errors.apiKey) {
-      setShowError(true);
+    if (showError) {
       const timer = setTimeout(() => {
         setShowError(false);
-      }, 3000); // Hide the error after 3 seconds
-      return () => clearTimeout(timer); // Clean up timer
+      }, 3000);
+      return () => clearTimeout(timer);
     }
-  }, [formik.submitCount]);
+  }, [showError]);
 
   return (
     <div className="relative flex flex-col items-center justify-center h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black overflow-hidden w-full">
@@ -61,12 +71,13 @@ const Landing: React.FC = () => {
             <button
               type="submit"
               className="px-6 py-2 text-white bg-violet-600 rounded-md hover:bg-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
+              disabled={formik.isSubmitting}
             >
-              Submit
+              {formik.isSubmitting ? 'Validating...' : 'Submit'}
             </button>
-            {showError && formik.errors.apiKey && (
+            {showError && (
               <div className="absolute -top-14 left-0 mt-2 w-full text-red-500 bg-gray-800 p-2 rounded shadow">
-                {formik.errors.apiKey}
+                Invalid API Key. Please try again.
               </div>
             )}
           </div>
