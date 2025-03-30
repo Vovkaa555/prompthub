@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useStore } from '../../../store/useStore';
 import OpenAI from 'openai';
 import { ChatCompletionMessageParam } from 'openai/resources/index.mjs';
+import ResponseAnimation from '../../../components/Animations/ResponseAnimation';
+import formatMessage from '../../../helpers/displayingDataHelpers';
 
 interface Message {
   role: 'user' | 'ai';
@@ -15,9 +17,14 @@ const Chat: React.FC = () => {
 
   const handleSendMessage = async () => {
     if (input.trim()) {
-      // Add the user's message to the chat
+      // User message
       const userMessage: Message = { role: 'user', content: input };
       setMessages((prev) => [...prev, userMessage]);
+
+      // Add AI reasoning message (animation)
+      const aiMessage: Message = { role: 'ai', content: 'Reasoning...' };
+      setMessages((prev) => [...prev, aiMessage]);
+
       const userInput = input;
       setInput('');
 
@@ -27,31 +34,38 @@ const Chat: React.FC = () => {
           dangerouslyAllowBrowser: true,
         });
 
-        // Build the message payload with proper typing.
         let messagePayload: ChatCompletionMessageParam;
         if (selectedRole === 'function') {
-          // When the role is "function", a "name" property is required.
           messagePayload = {
             role: selectedRole,
             content: userInput,
             name: 'defaultFunction',
           };
         } else {
-          // For other roles, the "name" property should not be present.
           messagePayload = {
             role: selectedRole,
             content: userInput,
           } as ChatCompletionMessageParam;
         }
 
+        // Wait for the AI response
         const completion = await client.chat.completions.create({
           model: openAIVersion,
           messages: [messagePayload],
         });
 
         const aiContent = completion.choices[0].message.content;
-        const aiMessage: Message = { role: 'ai', content: aiContent ?? '' };
-        setMessages((prev) => [...prev, aiMessage]);
+        const aiResponseMessage: Message = {
+          role: 'ai',
+          content: aiContent ?? '',
+        };
+
+        // Replace the reasoning message with the AI response
+        setMessages((prev) => {
+          const updatedMessages = [...prev];
+          updatedMessages[updatedMessages.length - 1] = aiResponseMessage;
+          return updatedMessages;
+        });
       } catch (error: any) {
         console.error('Error fetching AI response:', error);
         const errorMessage: Message = {
@@ -63,6 +77,13 @@ const Chat: React.FC = () => {
     }
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault(); // Prevent new line
+      handleSendMessage();
+    }
+  };
+
   return (
     <div className="w-full bg-gray-800 text-white flex flex-col h-full relative">
       {/* Chat Content: Scrollable Messages */}
@@ -70,13 +91,17 @@ const Chat: React.FC = () => {
         {messages.map((message, index) => (
           <div
             key={index}
-            className={`p-2 rounded-md max-w-[70%] ${
+            className={`p-2 rounded-md max-w-[70%] w-[70%] ${
               message.role === 'user'
                 ? 'bg-gray-600 self-start'
                 : 'bg-gray-300 text-black self-end'
             }`}
           >
-            {message.content}
+            {message.role === 'ai' && message.content === 'Reasoning...' ? (
+              <ResponseAnimation response={message.content} isLoading={true} /> // Show animation while reasoning
+            ) : (
+              formatMessage(message.content)
+            )}
           </div>
         ))}
       </div>
@@ -89,6 +114,7 @@ const Chat: React.FC = () => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type your message..."
+          onKeyDown={handleKeyDown}
         />
         <button
           onClick={handleSendMessage}

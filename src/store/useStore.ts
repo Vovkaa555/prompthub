@@ -1,5 +1,11 @@
 import { create } from 'zustand';
 
+interface Chat {
+  id: string;
+  title: string;
+  messages: { role: Role; content: string }[];
+}
+
 export type Role =
   | 'function'
   | 'user'
@@ -21,6 +27,12 @@ interface Store {
   setSelectedContent: (content: string) => void;
   contentDescriptions: { [key: string]: string }; // Store content title and description
   setContentDescriptions: (descriptions: { [key: string]: string }) => void;
+  chats: Chat[];
+  addChat: (chat: Chat) => void;
+  updateChat: (
+    id: string,
+    newMessages: { role: Role; content: string }[]
+  ) => void;
 }
 
 export const useStore = create<Store>((set) => ({
@@ -29,7 +41,7 @@ export const useStore = create<Store>((set) => ({
     set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
   storedApiKey: '',
   setApiKeyToStore: (key) => set({ storedApiKey: key }),
-  openAIVersion: 'gpt-3.5',
+  openAIVersion: 'gpt-3.5-turbo',
   setOpenAIVersion: (version: string) => set({ openAIVersion: version }),
   selectedRole: 'user',
   setSelectedRole: (role) => set({ selectedRole: role }),
@@ -54,4 +66,12 @@ export const useStore = create<Store>((set) => ({
   },
   setContentDescriptions: (descriptions) =>
     set({ contentDescriptions: descriptions }),
+  chats: [],
+  addChat: (chat) => set((state) => ({ chats: [...state.chats, chat] })),
+  updateChat: (id, newMessages) =>
+    set((state) => ({
+      chats: state.chats.map((chat) =>
+        chat.id === id ? { ...chat, messages: newMessages } : chat
+      ),
+    })),
 }));
